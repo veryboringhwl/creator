@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 import config from "./deno.json" with { type: "json" };
 
 const VERSION = config.version;
-const REPO = "veryboringhwl/creator";
 
 const PLATFORM_MAP: Readonly<Record<string, string>> = {
   win32: "windows",
@@ -66,10 +65,6 @@ function binaryPath(name: string): string {
   return join(cacheRoot(), `${name}-${VERSION}`);
 }
 
-function downloadUrl(name: string): string {
-  return `https://github.com/${REPO}/releases/download/${VERSION}/${name}`;
-}
-//https://github.com/veryboringhwl/v3/releases/latest/download/hooks.tar.gz
 async function exists(path: string): Promise<boolean> {
   try {
     await stat(path);
@@ -91,7 +86,7 @@ async function ensureBinary(): Promise<string> {
   const cache = cacheRoot();
   await mkdir(cache, { recursive: true });
 
-  const url = downloadUrl(name);
+  const url = `https://github.com/veryboringhwl/creator/releases/download/${VERSION}/${name}`;
   const tmp = join(cache, `${name}-${VERSION}.${randomUUID()}.tmp`);
 
   console.error(`Downloading creator v${VERSION} for ${platform.os}-${platform.arch}...`);
