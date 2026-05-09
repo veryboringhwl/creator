@@ -1,0 +1,69 @@
+name: Release Creator
+
+on:
+  push:
+    tags: ["creator-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset: creator-linux-x86_64
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset: creator-macos-x86_64
+
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset: creator-macos-arm64
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset: creator-windows-x86_64.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Stage binary
+        shell: pwsh
+        run: |
+          $binary = if ("${{ runner.os }}".StartsWith("Windows")) { "creator.exe" } else { "creator" }
+          $src = "target/${{ matrix.target }}/release/$binary"
+          Copy-Item -Path $src -Destination "${{ matrix.asset }}"
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ matrix.asset }}
+
+  publish-jsr:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Publish to JSR
+        working-directory: jsr
+        run: deno publish

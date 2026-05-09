@@ -1,0 +1,4 @@
+.swc/
+/deno.lock
+
+/dist/

@@ -1,0 +1,16 @@
+{
+  "name": "example",
+  "tags": ["example"],
+  "preview": "assets/PREVIEW.png",
+  "version": "1.0.0",
+  "authors": ["veryboring"],
+  "description": "Example module template",
+  "readme": "assets/README.md",
+  "entries": {
+    "js": "index.js",
+    "css": "index.css"
+  },
+  "dependencies": {
+    "spotify": "^1.2.89"
+  }
+}
