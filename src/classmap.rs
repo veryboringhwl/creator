@@ -63,7 +63,7 @@ pub fn reformat_mapping_for_css(mapping: &Mapping) -> Mapping {
 
 pub fn fetch_classmap_info(url: &str) -> Result<ClassmapInfo> {
     let semver_re = Regex::new(
-        r"^https://raw\.githubusercontent\.com/[^/]+/[^/]+/[^/]+/classmaps/(?P<semver>\d+\.\d+\.\d+)/classmap\.json$",
+        r"^https://raw\.githubusercontent\.com/[^/]+/[^/]+/[^/]+/(?P<semver>\d+\.\d+\.\d+)/classmap\.json$",
     )?;
 
     let version = if let Some(caps) = semver_re.captures(url) {
@@ -92,7 +92,7 @@ pub fn fetch_classmap_info(url: &str) -> Result<ClassmapInfo> {
         major * 1_000_000 + minor * 1_000 + patch
     } else {
         return Err(anyhow!(
-            "Invalid classmap url: {url}. Expected https://raw.githubusercontent.com/<owner>/<repo>/<ref>/classmaps/<major>.<minor>.<patch>/classmap.json"
+            "Invalid classmap url: {url}. Expected https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<major>.<minor>.<patch>/classmap.json"
         ));
     };
 

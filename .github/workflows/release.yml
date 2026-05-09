@@ -59,10 +59,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-
       - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
 
       - name: Publish to JSR
         working-directory: jsr
