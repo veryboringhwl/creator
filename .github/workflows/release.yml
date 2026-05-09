@@ -2,7 +2,7 @@ name: Release Creator
 
 on:
   push:
-    tags: ["creator-v*"]
+    tags: ["*"]
 
 permissions:
   contents: write
