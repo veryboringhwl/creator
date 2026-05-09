@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import config from "./deno.json" with { type: "json" };
 
 const VERSION = config.version;
-const REPO = "veryboringhwl/v3";
+const REPO = "veryboringhwl/creator";
 
 const PLATFORM_MAP: Readonly<Record<string, string>> = {
   win32: "windows",
@@ -67,7 +67,7 @@ function binaryPath(name: string): string {
 }
 
 function downloadUrl(name: string): string {
-  return `https://github.com/${REPO}/releases/download/creator-v${VERSION}/${name}`;
+  return `https://github.com/${REPO}/releases/download/${VERSION}/${name}`;
 }
 //https://github.com/veryboringhwl/v3/releases/latest/download/hooks.tar.gz
 async function exists(path: string): Promise<boolean> {
