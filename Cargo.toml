@@ -17,5 +17,5 @@ open = "5.3.4"
 reqwest = { version = "0.13.3", default-features = false, features = ["blocking", "json", "rustls"] }
 grass = "0.13.4"
 lightningcss = "1.0.0-alpha.71"
-swc_core = { version = "65.0.4", features = ["common", "ecma_ast", "ecma_parser", "ecma_codegen", "ecma_visit", "ecma_transforms", "ecma_transforms_typescript", "ecma_transforms_react"] }
+swc_core = { version = "66.0.2", features = ["common", "ecma_ast", "ecma_parser", "ecma_codegen", "ecma_visit", "ecma_transforms", "ecma_transforms_typescript", "ecma_transforms_react"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
