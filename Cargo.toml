@@ -14,7 +14,7 @@ walkdir = "2.5.0"
 regex = "1.12.3"
 notify = "8.2.0"
 open = "5.3.5"
-reqwest = { version = "0.13.3", default-features = false, features = ["blocking", "json", "rustls"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls"] }
 grass = "0.13.4"
 lightningcss = "1.0.0-alpha.71"
 swc_core = { version = "66.0.2", features = ["common", "ecma_ast", "ecma_parser", "ecma_codegen", "ecma_visit", "ecma_transforms", "ecma_transforms_typescript", "ecma_transforms_react"] }
