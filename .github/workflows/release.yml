@@ -2,7 +2,12 @@ name: Release Creator
 
 on:
   push:
-    tags: ["*"]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release version (without v prefix)"
+        required: true
 
 permissions:
   contents: write
