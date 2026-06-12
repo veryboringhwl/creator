@@ -13,12 +13,12 @@ const VERSION = config.version;
 const PLATFORM_MAP: Readonly<Record<string, string>> = {
   win32: "windows",
   darwin: "macos",
-  linux: "linux",
+  linux: "linux"
 };
 
 const ARCH_MAP: Readonly<Record<string, string>> = {
   x64: "x86_64",
-  arm64: "arm64",
+  arm64: "arm64"
 };
 
 function detectPlatform(): { os: string; arch: string } {
@@ -97,7 +97,7 @@ async function ensureBinary(): Promise<string> {
   } catch (err) {
     console.error(
       `Failed to reach GitHub. Check your network connection.\n` +
-        `Error: ${err instanceof Error ? err.message : String(err)}`,
+        `Error: ${err instanceof Error ? err.message : String(err)}`
     );
     process.exit(1);
   }
@@ -108,7 +108,7 @@ async function ensureBinary(): Promise<string> {
         `No binary found for ${platform.os}-${platform.arch}.\n\n` +
           `Ensure a GitHub Release tagged "creator-v${VERSION}" exists ` +
           `with the asset "${name}".\n` +
-          `Expected URL: ${url}`,
+          `Expected URL: ${url}`
       );
     } else {
       console.error(`Download failed: HTTP ${res.status} ${res.statusText}`);
@@ -122,7 +122,7 @@ async function ensureBinary(): Promise<string> {
   } catch (err) {
     console.error(
       `Failed to read download stream.\n` +
-        `Error: ${err instanceof Error ? err.message : String(err)}`,
+        `Error: ${err instanceof Error ? err.message : String(err)}`
     );
     await rm(tmp, { force: true });
     process.exit(1);
@@ -139,7 +139,7 @@ async function ensureBinary(): Promise<string> {
     console.error(
       `Failed to write binary to disk.\n` +
         `Path: ${tmp}\n` +
-        `Error: ${err instanceof Error ? err.message : String(err)}`,
+        `Error: ${err instanceof Error ? err.message : String(err)}`
     );
     process.exit(1);
   }
@@ -150,7 +150,7 @@ async function ensureBinary(): Promise<string> {
     } catch (err) {
       console.error(
         `Failed to set executable permissions.\n` +
-          `Error: ${err instanceof Error ? err.message : String(err)}`,
+          `Error: ${err instanceof Error ? err.message : String(err)}`
       );
       process.exit(1);
     }
@@ -161,7 +161,7 @@ async function ensureBinary(): Promise<string> {
   } catch (err) {
     console.error(
       `Failed to finalize binary installation.\n` +
-        `Error: ${err instanceof Error ? err.message : String(err)}`,
+        `Error: ${err instanceof Error ? err.message : String(err)}`
     );
     await rm(tmp, { force: true });
     process.exit(1);
@@ -225,7 +225,7 @@ function osSignum(signal: string): number {
     SIGWINCH: 28,
     SIGPOLL: 29,
     SIGPWR: 30,
-    SIGSYS: 31,
+    SIGSYS: 31
   };
   return map[signal] ?? 0;
 }

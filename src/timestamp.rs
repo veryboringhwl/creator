@@ -1,4 +1,5 @@
-use std::{env, path::PathBuf};
+use std::env;
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use serde_json::Value;
@@ -20,7 +21,7 @@ impl TimestampResolver {
         let vault: Value = read_json(&vault_path).ok()?;
         let modules_obj = vault.get("modules")?.as_object()?;
         let mut modules: Vec<String> = modules_obj.keys().cloned().collect();
-        modules.sort_by(|a, b| b.len().cmp(&a.len()));
+        modules.sort_by_key(|b| std::cmp::Reverse(b.len()));
         Some(Self {
             config_dir,
             modules,

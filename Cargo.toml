@@ -8,14 +8,20 @@ anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 dialoguer = "0.12"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 rayon = "1.12.0"
 walkdir = "2.5.0"
 regex = "1.12.3"
 notify = "8.2.0"
 open = "5.3.5"
-reqwest = { version = "0.13.3", default-features = false, features = ["blocking", "json", "rustls"] }
+reqwest = { version = "0.13.4", default-features = false, features = [
+  "blocking",
+  "json",
+  "rustls"
+] }
 grass = "0.13.4"
 lightningcss = "1.0.0-alpha.71"
-swc_core = { version = "66.0.2", features = ["common", "ecma_ast", "ecma_parser", "ecma_codegen", "ecma_visit", "ecma_transforms", "ecma_transforms_typescript", "ecma_transforms_react"] }
+oxc = { version = "0.135", features = ["full"] }
+oxc_react_compiler = "0.135.0"
+base64 = "0.22"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }

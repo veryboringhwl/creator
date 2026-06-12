@@ -1,12 +1,16 @@
 edition = "2024"
-style_edition = "2024"
 
 max_width = 100
-
-imports_granularity = "Crate"
-group_imports = "StdExternalCrate"
-imports_layout = "horizontal"
+use_field_init_shorthand = true
 
 wrap_comments = true
 comment_width = 100
 format_code_in_doc_comments = true
+
+# Unstable options. These require a nightly compiler to use (cargo +nightly fmt).
+
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+imports_layout = "Horizontal"
+
+format_macro_matchers = true

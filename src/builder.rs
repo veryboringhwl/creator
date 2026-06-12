@@ -1,9 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    fs,
-    path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use rayon::prelude::*;
@@ -11,9 +9,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use walkdir::WalkDir;
 
-use crate::{
-    transpile::Transpiler, util::{ensure_parent, normalize_slashes}
-};
+use crate::css::CssTranspiler;
+use crate::js::JsTranspiler;
+use crate::util::{ensure_parent, normalize_slashes};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct MetadataEntries {
@@ -69,42 +67,66 @@ pub struct BuildOpts {
 
 pub struct Builder {
     scripts_input: Option<Vec<PathBuf>>,
-    scss_input: Option<PathBuf>,
+    css_input: Option<CssInput>,
     pub identifier: String,
     pub input_dir: PathBuf,
     pub output_dir: PathBuf,
-    transpiler: Transpiler,
+    js_transpiler: JsTranspiler,
+    css_transpiler: CssTranspiler,
+    pub dev: bool,
+}
+
+pub enum CssInput {
+    Scss(PathBuf),
+    Css(PathBuf),
 }
 
 impl Builder {
-    pub fn new(transpiler: Transpiler, opts: BuilderOpts) -> Result<Self> {
+    pub fn new(
+        js_transpiler: JsTranspiler,
+        css_transpiler: CssTranspiler,
+        dev: bool,
+        opts: BuilderOpts,
+    ) -> Result<Self> {
         let scripts_input = if opts.metadata.entries.js.is_some() {
             Some(collect_js_inputs(&opts.input_dir))
         } else {
             None
         };
 
-        let scss_input = if let Some(css) = &opts.metadata.entries.css {
-            let scss = if css.ends_with(".css") {
-                let mut scss = css.clone();
-                scss.truncate(css.len() - 4);
-                scss.push_str(".scss");
-                scss
+        let css_input = if let Some(css) = &opts.metadata.entries.css {
+            let scss_path = if css.ends_with(".css") {
+                let mut stem = css.clone();
+                stem.truncate(css.len() - 4);
+                stem.push_str(".scss");
+                opts.input_dir.join(stem)
             } else {
-                css.clone()
+                opts.input_dir.join(css)
             };
-            Some(opts.input_dir.join(scss))
+
+            if scss_path.exists() {
+                Some(CssInput::Scss(scss_path))
+            } else {
+                let css_path = opts.input_dir.join(css);
+                if css_path.exists() {
+                    Some(CssInput::Css(css_path))
+                } else {
+                    None
+                }
+            }
         } else {
             None
         };
 
         Ok(Self {
             scripts_input,
-            scss_input,
+            css_input,
             identifier: opts.identifier,
             input_dir: opts.input_dir,
             output_dir: opts.output_dir,
-            transpiler,
+            js_transpiler,
+            css_transpiler,
+            dev,
         })
     }
 
@@ -127,7 +149,7 @@ impl Builder {
             let file_type = parse_file_type(path, &rel);
             match file_type {
                 FileType::ToJS => scripts_input.push(path.to_path_buf()),
-                FileType::UNKNOWN => unknown_files.push(rel),
+                FileType::Unknown => unknown_files.push(rel),
                 _ => {}
             }
         }
@@ -136,7 +158,7 @@ impl Builder {
         unknown_files.sort();
 
         let js_should_run = opts.js && self.scripts_input.is_some();
-        let css_should_run = opts.css && self.scss_input.is_some();
+        let css_should_run = opts.css && self.css_input.is_some();
         let copy_should_run = opts.unknown && !unknown_files.is_empty();
         let did_build_js = js_should_run;
         let did_work = js_should_run || css_should_run || copy_should_run;
@@ -151,7 +173,7 @@ impl Builder {
             },
             || {
                 if css_should_run {
-                    self.css(self.scss_input.as_ref().unwrap())
+                    self.css(self.css_input.as_ref().unwrap())
                 } else {
                     Ok(())
                 }
@@ -161,28 +183,28 @@ impl Builder {
         css_result?;
 
         if copy_should_run {
-            unknown_files.par_iter().try_for_each(|rel| {
-                self.copy_file(rel)
-            })?;
+            unknown_files
+                .par_iter()
+                .try_for_each(|rel| self.copy_file(rel))?;
         }
 
         if did_work {
             let timestamp = self.output_dir.join("timestamp");
-            if self.transpiler.dev {
+            if self.dev {
                 ensure_parent(&timestamp)?;
                 fs::write(&timestamp, format!("{now}")).with_context(|| {
                     format!("Failed to write timestamp: {}", timestamp.display())
                 })?;
-            } else if let Err(err) = fs::remove_file(&timestamp) {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    return Err(err).with_context(|| {
-                        format!("Failed to remove timestamp: {}", timestamp.display())
-                    });
-                }
+            } else if let Err(err) = fs::remove_file(&timestamp)
+                && err.kind() != std::io::ErrorKind::NotFound
+            {
+                return Err(err).with_context(|| {
+                    format!("Failed to remove timestamp: {}", timestamp.display())
+                });
             }
         }
 
-        if self.transpiler.dev && did_build_js {
+        if self.dev && did_build_js {
             self.refresh_dev_dependents()?;
         }
 
@@ -203,26 +225,53 @@ impl Builder {
         self.output_dir.join(rel)
     }
 
-    pub fn js(&self, inputs: &[PathBuf], timestamp: u64) -> Result<()> {
+    fn js(&self, inputs: &[PathBuf], timestamp: u64) -> Result<()> {
         inputs.par_iter().try_for_each(|input| {
             let rel = self.get_relative_path(input);
             let mut rel_js = rel.clone();
             rel_js.set_extension("js");
             let output = self.get_output_path(&rel_js);
+
+            if !needs_rebuild(input, &output)? {
+                return Ok(());
+            }
+
             let rel_js_str = normalize_slashes(&rel_js);
             let filepath = format!("/modules/{}/{}", self.identifier, rel_js_str);
-            self.transpiler
-                .js(input, &output, &self.input_dir, &filepath, timestamp)
+            self.js_transpiler
+                .transpile(input, &output, &filepath, timestamp)
         })
     }
 
-    pub fn css(&self, input: &Path) -> Result<()> {
-        let rel = self.get_relative_path(input);
-        let mut rel_css = rel.clone();
-        rel_css.set_extension("css");
-        let output = self.get_output_path(&rel_css);
-        self.transpiler
-            .css(input, &output, self.scripts_input.as_deref().unwrap_or(&[]))?;
+    fn css(&self, input: &CssInput) -> Result<()> {
+        match input {
+            CssInput::Scss(path) => {
+                let rel = self.get_relative_path(path);
+                let mut rel_css = rel.clone();
+                rel_css.set_extension("css");
+                let output = self.get_output_path(&rel_css);
+
+                if !needs_rebuild(path, &output)? {
+                    return Ok(());
+                }
+
+                self.css_transpiler.transpile_scss(
+                    path,
+                    &output,
+                    self.scripts_input.as_deref().unwrap_or(&[]),
+                )?;
+            }
+            CssInput::Css(path) => {
+                let rel = self.get_relative_path(path);
+                let output = self.get_output_path(&rel);
+
+                if !needs_rebuild(path, &output)? {
+                    return Ok(());
+                }
+
+                self.css_transpiler.transpile_css(path, &output)?;
+            }
+        }
         Ok(())
     }
 
@@ -298,9 +347,8 @@ impl Builder {
                 continue;
             }
 
-            let metadata: Metadata = crate::util::read_json(&metadata_path).with_context(|| {
-                format!("Failed to parse metadata for module {}", module_id)
-            })?;
+            let metadata: Metadata = crate::util::read_json(&metadata_path)
+                .with_context(|| format!("Failed to parse metadata for module {}", module_id))?;
 
             for dep in metadata.dependencies.dependency_ids() {
                 reverse_graph
@@ -350,14 +398,22 @@ impl Builder {
 
         let inputs = collect_js_inputs(&module_dir);
         inputs.par_iter().try_for_each(|input| {
-            let rel = input.strip_prefix(&module_dir).unwrap_or(input).to_path_buf();
+            let rel = input
+                .strip_prefix(&module_dir)
+                .unwrap_or(input)
+                .to_path_buf();
             let mut rel_js = rel.clone();
             rel_js.set_extension("js");
             let output = module_dir.join(&rel_js);
+
+            if !needs_rebuild(input, &output)? {
+                return Ok(());
+            }
+
             let rel_js_str = normalize_slashes(&rel_js);
             let filepath = format!("/modules/{}/{}", module_id, rel_js_str);
-            self.transpiler
-                .js(input, &output, &module_dir, &filepath, timestamp)
+            self.js_transpiler
+                .transpile(input, &output, &filepath, timestamp)
         })?;
 
         let timestamp_file = module_dir.join("timestamp");
@@ -376,40 +432,37 @@ impl Builder {
 pub enum FileType {
     ToJS,
     ToCSS,
-    JS,
-    CSS,
-    UNKNOWN,
+    Css,
+    Unknown,
 }
 
 pub fn parse_file_type(path: &Path, rel: &Path) -> FileType {
     match path.extension().and_then(|ext| ext.to_str()).unwrap_or("") {
-        "js" => FileType::JS,
+        "js" => FileType::ToJS,
         "ts" => {
             if rel.to_string_lossy().ends_with(".d.ts") {
-                FileType::UNKNOWN
+                FileType::Unknown
             } else {
                 FileType::ToJS
             }
         }
         "mjs" | "jsx" | "tsx" => FileType::ToJS,
-        "css" => FileType::CSS,
+        "css" => FileType::Css,
         "scss" => FileType::ToCSS,
-        _ => FileType::UNKNOWN,
+        _ => FileType::Unknown,
     }
 }
 
 fn collect_js_inputs(root: &Path) -> Vec<PathBuf> {
     let mut inputs = Vec::new();
-    for entry in WalkDir::new(root) {
-        if let Ok(entry) = entry {
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let path = entry.path();
-            let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
-            if matches!(parse_file_type(path, &rel), FileType::ToJS) {
-                inputs.push(path.to_path_buf());
-            }
+    for entry in WalkDir::new(root).into_iter().flatten() {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let path = entry.path();
+        let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
+        if matches!(parse_file_type(path, &rel), FileType::ToJS) {
+            inputs.push(path.to_path_buf());
         }
     }
     inputs.sort();
@@ -433,4 +486,18 @@ fn contains_module_manifests(root: &Path) -> bool {
     }
 
     false
+}
+
+fn needs_rebuild(input: &Path, output: &Path) -> Result<bool> {
+    let input_meta = match fs::metadata(input) {
+        Ok(m) => m,
+        Err(_) => return Ok(true),
+    };
+    let output_meta = match fs::metadata(output) {
+        Ok(m) => m,
+        Err(_) => return Ok(true),
+    };
+    let input_mtime = input_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+    let output_mtime = output_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+    Ok(input_mtime > output_mtime)
 }

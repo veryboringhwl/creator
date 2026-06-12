@@ -1,22 +1,26 @@
 mod builder;
 mod classmap;
+mod css;
+mod js;
 mod release;
 mod scaffold;
 mod timestamp;
-mod transpile;
 mod util;
 mod watch;
 
-use std::{
-    fs, path::{Path, PathBuf}, time::Instant
-};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use builder::{BuildOpts, Builder, BuilderOpts, Metadata};
 use clap::{Parser, Subcommand};
-use classmap::{discover_module_dirs, fetch_classmap_info, gen_classmap_dts};
+use classmap::{
+    discover_module_dirs, fetch_classmap_info, gen_classmap_dts, reformat_mapping_for_css
+};
+use css::CssTranspiler;
+use js::JsTranspiler;
 use scaffold::CliNewOpts;
-use transpile::Transpiler;
 use util::{read_json, write_text};
 
 const CLASSMAP_URL_ENV: &str = "CREATOR_CLASSMAP_URL";
@@ -109,9 +113,8 @@ enum Command {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let started = Instant::now();
 
-    let result = match cli.command {
+    match cli.command {
         Command::New {
             name,
             dir,
@@ -163,12 +166,7 @@ fn main() -> Result<()> {
             let cm_url = resolve_classmap_url(url)?;
             run_classmap_fetch(&cm_url, &output, &modules_dir)
         }
-    };
-
-    let elapsed = started.elapsed();
-    eprintln!("Finished in {elapsed:.2?}");
-
-    result
+    }
 }
 
 fn run_build(
@@ -192,11 +190,18 @@ fn run_build(
             .ok_or_else(|| anyhow::anyhow!("--module is required when metadata.name is missing"))?,
     };
 
-    let mapping =
+    let mapping: crate::classmap::Mapping =
         read_json(&classmap).with_context(|| format!("Failed to read {}", classmap.display()))?;
 
+    let js_transpiler = JsTranspiler::new(mapping.clone(), dev, dev);
+    let css_mapping = reformat_mapping_for_css(&mapping);
+    let css_transpiler = CssTranspiler::new(css_mapping);
+
+    let id = identifier.clone();
     let builder = Builder::new(
-        Transpiler::new(mapping, dev),
+        js_transpiler,
+        css_transpiler,
+        dev,
         BuilderOpts {
             metadata,
             identifier,
@@ -205,11 +210,14 @@ fn run_build(
         },
     )?;
 
+    let build_start = Instant::now();
     builder.build(BuildOpts {
         js: true,
         css: true,
         unknown: false,
     })?;
+    let elapsed = build_start.elapsed();
+    eprintln!("{id} finished in {elapsed:.2?}");
 
     if watch {
         crate::watch::watch(&builder, debounce)?;

@@ -1,20 +1,18 @@
-use std::{
-    fs::{self, File},
-    io,
-    path::{Path, PathBuf},
-};
+use std::fs::{self, File};
+use std::io;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use rayon::prelude::*;
 use walkdir::WalkDir;
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
 
-use crate::{
-    builder::{BuildOpts, Builder, BuilderOpts, Metadata},
-    classmap::{fetch_classmap_info, ClassmapInfo},
-    transpile::Transpiler,
-    util::write_text,
-};
+use crate::builder::{BuildOpts, Builder, BuilderOpts, Metadata};
+use crate::classmap::{ClassmapInfo, fetch_classmap_info, reformat_mapping_for_css};
+use crate::css::CssTranspiler;
+use crate::js::JsTranspiler;
+use crate::util::write_text;
 
 pub struct ReleaseOpts {
     pub inputs: Vec<PathBuf>,
@@ -128,13 +126,12 @@ fn build_and_zip(
     classmap_semver: &str,
 ) -> Result<ArtifactEntry> {
     let metadata_path = input_dir.join("metadata.json");
-    let metadata_raw =
-        fs::read_to_string(&metadata_path).map_err(|_| {
-            let e: Box<dyn std::error::Error + Send + Sync> = Box::new(BuildError {
-                module_dir: input_dir.display().to_string(),
-            });
-            anyhow::Error::msg("missing metadata.json").context(e)
-        })?;
+    let metadata_raw = fs::read_to_string(&metadata_path).map_err(|_| {
+        let e: Box<dyn std::error::Error + Send + Sync> = Box::new(BuildError {
+            module_dir: input_dir.display().to_string(),
+        });
+        anyhow::Error::msg("missing metadata.json").context(e)
+    })?;
     let metadata: Metadata = serde_json::from_str(&metadata_raw)
         .with_context(|| format!("Failed to parse {}", metadata_path.display()))?;
     let mut metadata_value: serde_json::Value = serde_json::from_str(&metadata_raw)
@@ -158,9 +155,14 @@ fn build_and_zip(
     fs::create_dir_all(&build_dir)
         .with_context(|| format!("Failed to create build dir: {}", build_dir.display()))?;
 
-    let transpiler = Transpiler::new(info.mapping.clone(), false);
+    let js_transpiler = JsTranspiler::new(info.mapping.clone(), false, false);
+    let css_mapping = reformat_mapping_for_css(&info.mapping);
+    let css_transpiler = CssTranspiler::new(css_mapping);
+
     let builder = Builder::new(
-        transpiler,
+        js_transpiler,
+        css_transpiler,
+        false,
         BuilderOpts {
             metadata,
             identifier: identifier.clone(),

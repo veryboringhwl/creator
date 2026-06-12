@@ -1,10 +1,10 @@
 {
-  "name": "example",
-  "tags": ["example"],
+  "name": "{{MODULE_NAME}}",
+  "tags": ["{{MODULE_NAME}}"],
   "preview": "assets/PREVIEW.png",
   "version": "1.0.0",
-  "authors": ["veryboring"],
-  "description": "Example module template",
+  "authors": ["{{AUTHOR}}"],
+  "description": "{{DESCRIPTION}}",
   "readme": "assets/README.md",
   "entries": {
     "js": "index.js",

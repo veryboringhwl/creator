@@ -1,0 +1,8 @@
+{
+  "plugins": ["typescript", "oxc"],
+  "rules": {
+    "no-debugger": "off",
+    "typescript/no-explicit-any": "off"
+  },
+  "ignorePatterns": ["node_modules", "templates/**"]
+}

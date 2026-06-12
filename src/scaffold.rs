@@ -1,7 +1,5 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::ValueEnum;
@@ -73,17 +71,14 @@ fn is_modules_repo(cwd: &Path) -> bool {
 }
 
 fn has_required_cli_args(opts: &CliNewOpts) -> bool {
-    opts.name.is_some()
-        && opts.author.is_some()
-        && opts.template.is_some()
-        && opts.biome.is_some()
+    opts.name.is_some() && opts.author.is_some() && opts.template.is_some() && opts.biome.is_some()
 }
 
 fn build_from_cli(opts: CliNewOpts) -> Result<ProjectOpts> {
     let name = opts
         .name
         .ok_or_else(|| anyhow::anyhow!("--name is required in non-interactive mode"))?;
-    let author = opts.author.unwrap_or_else(|| guess_author());
+    let author = opts.author.unwrap_or_else(guess_author);
     let template = opts
         .template
         .ok_or_else(|| anyhow::anyhow!("--template is required in non-interactive mode"))?;
@@ -130,7 +125,12 @@ fn run_wizard(cwd: &Path, in_modules_repo: bool) -> Result<ProjectOpts> {
 
     let template_idx = Select::new()
         .with_prompt("Template")
-        .items(&ModuleTemplate::ALL.iter().map(|t| t.label()).collect::<Vec<_>>())
+        .items(
+            ModuleTemplate::ALL
+                .iter()
+                .map(|t| t.label())
+                .collect::<Vec<_>>(),
+        )
         .default(0)
         .interact()?;
     let template = ModuleTemplate::ALL[template_idx];
@@ -212,8 +212,7 @@ fn scaffold_project(opts: &ProjectOpts) -> Result<()> {
         ));
     }
 
-    fs::create_dir_all(&root)
-        .with_context(|| format!("Failed to create {}", root.display()))?;
+    fs::create_dir_all(&root).with_context(|| format!("Failed to create {}", root.display()))?;
 
     // Root-level config files
     let project_files = render_project_files(opts);
@@ -231,7 +230,8 @@ fn scaffold_project(opts: &ProjectOpts) -> Result<()> {
     fs::create_dir_all(&module_dir)
         .with_context(|| format!("Failed to create {}", module_dir.display()))?;
 
-    let module_files = render_module_files(opts.template, &opts.name, &opts.author, &opts.description);
+    let module_files =
+        render_module_files(opts.template, &opts.name, &opts.author, &opts.description);
     for (rel, contents) in &module_files {
         let dest = module_dir.join(rel);
         write_text(&dest, contents)?;
@@ -280,19 +280,52 @@ fn render_module_files(
 fn render_project_files(opts: &ProjectOpts) -> Vec<(PathBuf, String)> {
     let mut files = vec![
         (PathBuf::from("deno.json"), PROJECT_DENO_JSON.to_string()),
-        (PathBuf::from("classmap.json"), PROJECT_CLASSMAP_JSON.to_string()),
+        (
+            PathBuf::from("classmap.json"),
+            PROJECT_CLASSMAP_JSON.to_string(),
+        ),
         (PathBuf::from("vault.json"), PROJECT_VAULT_JSON.to_string()),
         (PathBuf::from(".gitignore"), PROJECT_GITIGNORE.to_string()),
-        (PathBuf::from(".editorconfig"), PROJECT_EDITORCONFIG.to_string()),
-        (PathBuf::from("scripts/build-dev.ps1"), PROJECT_BUILD_DEV_PS1.to_string()),
-        (PathBuf::from("scripts/watch-dev.ps1"), PROJECT_WATCH_DEV_PS1.to_string()),
-        (PathBuf::from("scripts/enable-dev.ps1"), PROJECT_ENABLE_DEV_PS1.to_string()),
-        (PathBuf::from("scripts/build-dev.sh"), PROJECT_BUILD_DEV_SH.to_string()),
-        (PathBuf::from("scripts/watch-dev.sh"), PROJECT_WATCH_DEV_SH.to_string()),
-        (PathBuf::from("scripts/enable-dev.sh"), PROJECT_ENABLE_DEV_SH.to_string()),
-        (PathBuf::from("scripts/build-local.ts"), PROJECT_BUILD_LOCAL_TS.to_string()),
-        (PathBuf::from("scripts/build-shared.ts"), PROJECT_BUILD_SHARED_TS.to_string()),
-        (PathBuf::from("scripts/cron.ts"), PROJECT_CRON_TS.to_string()),
+        (
+            PathBuf::from(".editorconfig"),
+            PROJECT_EDITORCONFIG.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/build-dev.ps1"),
+            PROJECT_BUILD_DEV_PS1.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/watch-dev.ps1"),
+            PROJECT_WATCH_DEV_PS1.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/enable-dev.ps1"),
+            PROJECT_ENABLE_DEV_PS1.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/build-dev.sh"),
+            PROJECT_BUILD_DEV_SH.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/watch-dev.sh"),
+            PROJECT_WATCH_DEV_SH.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/enable-dev.sh"),
+            PROJECT_ENABLE_DEV_SH.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/build-local.ts"),
+            PROJECT_BUILD_LOCAL_TS.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/build-shared.ts"),
+            PROJECT_BUILD_SHARED_TS.to_string(),
+        ),
+        (
+            PathBuf::from("scripts/cron.ts"),
+            PROJECT_CRON_TS.to_string(),
+        ),
     ];
 
     if opts.biome {
@@ -328,7 +361,8 @@ const MODULE_CUSTOM_APP_LOAD_TS: &str = include_str!("../templates/modules/app/l
 const MODULE_CUSTOM_APP_MIXIN_TS: &str = include_str!("../templates/modules/app/mixin.ts");
 const MODULE_CUSTOM_APP_CSS: &str = include_str!("../templates/modules/app/index.css");
 
-const MODULE_EXTENSION_METADATA: &str = include_str!("../templates/modules/extension/metadata.json");
+const MODULE_EXTENSION_METADATA: &str =
+    include_str!("../templates/modules/extension/metadata.json");
 const MODULE_EXTENSION_INDEX_TS: &str = include_str!("../templates/modules/extension/index.ts");
 const MODULE_EXTENSION_LOAD_TS: &str = include_str!("../templates/modules/extension/load.ts");
 const MODULE_EXTENSION_MIXIN_TS: &str = include_str!("../templates/modules/extension/mixin.ts");
