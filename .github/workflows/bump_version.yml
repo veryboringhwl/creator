@@ -29,6 +29,8 @@ jobs:
         id: version
         run: |
           cargo set-version --bump ${{ inputs.bump }}
+          cargo update -p creator
+          (cd jsr && deno bump-version ${{ inputs.bump }})
           echo "version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[] | select(.name == "creator") | .version')" >> "$GITHUB_OUTPUT"
 
       - uses: IAreKyleW00t/verified-bot-commit@v2.3.2
