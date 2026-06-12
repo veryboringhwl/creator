@@ -25,6 +25,8 @@ jobs:
         with:
           tool: cargo-edit
 
+      - uses: denoland/setup-deno@v2
+
       - name: Bump version
         id: version
         run: |
