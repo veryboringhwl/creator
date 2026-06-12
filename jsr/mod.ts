@@ -86,7 +86,7 @@ async function ensureBinary(): Promise<string> {
   const cache = cacheRoot();
   await mkdir(cache, { recursive: true });
 
-  const url = `https://github.com/veryboringhwl/creator/releases/download/${VERSION}/${name}`;
+  const url = `https://github.com/veryboringhwl/creator/releases/download/v${VERSION}/${name}`;
   const tmp = join(cache, `${name}-${VERSION}.${randomUUID()}.tmp`);
 
   console.error(`Downloading creator v${VERSION} for ${platform.os}-${platform.arch}...`);
