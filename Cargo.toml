@@ -1,6 +1,6 @@
 [package]
 name = "creator"
-version = "0.0.0"
+version = "0.0.5"
 edition = "2024"
 
 [dependencies]
@@ -11,7 +11,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 rayon = "1.12.0"
 walkdir = "2.5.0"
-regex = "1.12.3"
+regex = "1.12.4"
 notify = "8.2.0"
 open = "5.3.5"
 reqwest = { version = "0.13.4", default-features = false, features = [
@@ -21,7 +21,7 @@ reqwest = { version = "0.13.4", default-features = false, features = [
 ] }
 grass = "0.13.4"
 lightningcss = "1.0.0-alpha.71"
-oxc = { version = "0.135", features = ["full"] }
+oxc = { version = "0.135.0", features = ["full"] }
 oxc_react_compiler = "0.135.0"
 base64 = "0.22"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
