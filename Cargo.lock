@@ -480,7 +480,6 @@ dependencies = [
  "notify",
  "open",
  "oxc",
- "oxc_react_compiler",
  "rayon",
  "regex",
  "reqwest",

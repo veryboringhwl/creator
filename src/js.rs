@@ -11,7 +11,6 @@ use oxc::parser::Parser;
 use oxc::semantic::SemanticBuilder;
 use oxc::span::SourceType;
 use oxc::transformer::{JsxOptions, JsxRuntime, TransformOptions, Transformer, TypeScriptOptions};
-use oxc_react_compiler::{CompilerTarget, PluginOptions, default_plugin_options, transform};
 use regex::Regex;
 
 use crate::classmap::Mapping;
@@ -141,40 +140,7 @@ impl JsTranspiler {
             ));
         }
 
-        let react_options = PluginOptions {
-            target: CompilerTarget::Version("18".to_string()),
-            ..default_plugin_options()
-        };
-
-        let react_result = transform(&program, &semantic_ret.semantic, &allocator, react_options);
-
-        for diagnostic in &react_result.diagnostics {
-            eprintln!(
-                "[React Compiler Warning in {}]: {:?}",
-                input.display(),
-                diagnostic
-            );
-        }
-
-        let scoping = if let Some(compiled) = react_result.program {
-            program = compiled;
-
-            let new_semantic_ret = SemanticBuilder::new()
-                .with_check_syntax_error(true)
-                .build(&program);
-
-            if !new_semantic_ret.errors.is_empty() {
-                return Err(anyhow!(
-                    "Semantic analysis failed after React Compiler optimization for {}: {:?}",
-                    input.display(),
-                    new_semantic_ret.errors
-                ));
-            }
-
-            new_semantic_ret.semantic.into_scoping()
-        } else {
-            semantic_ret.semantic.into_scoping()
-        };
+        let scoping = semantic_ret.semantic.into_scoping();
 
         let mut ext_rewriter = ExtensionRewriter::new(&allocator, &self.ext_rules);
         ext_rewriter.visit_program(&mut program);
