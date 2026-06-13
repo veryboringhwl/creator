@@ -1,6 +1,6 @@
 {
   "name": "@veryboringhwl/creator",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "license": "LGPL-2.1-only",
   "exports": {
     ".": "./mod.ts"
