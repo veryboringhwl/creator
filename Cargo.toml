@@ -21,6 +21,6 @@ reqwest = { version = "0.13.4", default-features = false, features = [
 ] }
 grass = "0.13.4"
 lightningcss = "1.0.0-alpha.71"
-oxc = { version = "0.135.0", features = ["full"] }
+oxc = { version = "0.136.0", features = ["full"] }
 base64 = "0.22"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
