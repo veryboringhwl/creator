@@ -10,39 +10,24 @@ import config from "./deno.json" with { type: "json" };
 
 const VERSION = config.version;
 
-const PLATFORM_MAP: Readonly<Record<string, string>> = {
-  win32: "windows",
-  darwin: "macos",
-  linux: "linux"
+const ASSETS: Readonly<Record<string, string>> = {
+  "win32-x64": "creator-windows-x86_64.exe",
+  "win32-arm64": "creator-windows-arm64.exe",
+  "darwin-x64": "creator-macos-x86_64",
+  "darwin-arm64": "creator-macos-arm64",
+  "linux-x64": "creator-linux-x86_64"
 };
 
-const ARCH_MAP: Readonly<Record<string, string>> = {
-  x64: "x86_64",
-  arm64: "arm64"
-};
-
-function detectPlatform(): { os: string; arch: string } {
-  const os = PLATFORM_MAP[process.platform];
-  const arch = ARCH_MAP[process.arch];
-
-  if (!os) {
-    console.error(`Unsupported operating system: ${process.platform}`);
-    console.error("Supported: win32 (Windows), darwin (macOS), linux");
+function detectPlatform(): string {
+  const key = `${process.platform}-${process.arch}`;
+  const asset = ASSETS[key];
+  if (!asset) {
+    const supported = Object.keys(ASSETS).join(", ");
+    console.error(`Unsupported platform: ${key}`);
+    console.error(`Supported: ${supported}`);
     process.exit(1);
   }
-
-  if (!arch) {
-    console.error(`Unsupported architecture: ${process.arch}`);
-    console.error("Supported: x64 (x86_64), arm64 (aarch64)");
-    process.exit(1);
-  }
-
-  return { os, arch };
-}
-
-function assetName(platform: { os: string; arch: string }): string {
-  const ext = process.platform === "win32" ? ".exe" : "";
-  return `creator-${platform.os}-${platform.arch}${ext}`;
+  return asset;
 }
 
 function cacheRoot(): string {
@@ -89,8 +74,7 @@ function abort(message: string): never {
 }
 
 async function ensureBinary(): Promise<string> {
-  const platform = detectPlatform();
-  const name = assetName(platform);
+  const name = detectPlatform();
   const bin = binaryPath(name);
 
   if ((await exists(bin)) && (await exists(sha256Path(name)))) {
@@ -104,13 +88,13 @@ async function ensureBinary(): Promise<string> {
   const assetUrl = `${baseUrl}/${name}`;
   const sha256Url = `${baseUrl}/${name}.sha256`;
 
-  console.error(`Downloading creator v${VERSION} for ${platform.os}-${platform.arch}...`);
+  console.error(`Downloading creator v${VERSION} (${name})...`);
 
   const [binRes, shaRes] = await Promise.all([fetch(assetUrl), fetch(sha256Url)]);
   if (!binRes.ok) {
     if (binRes.status === 404) {
       abort(
-        `No binary found for ${platform.os}-${platform.arch}.\n\n` +
+        `No binary found for ${name}.\n\n` +
           `Ensure a GitHub Release tagged "creator-v${VERSION}" exists ` +
           `with the assets "${name}" and "${name}.sha256".\n` +
           `Expected URL: ${assetUrl}`
