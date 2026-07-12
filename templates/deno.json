@@ -4,12 +4,10 @@
     "/modules/": "./modules/"
   },
   "tasks": {
-    "build": "deno run -A jsr:@veryboringhwl/creator@0.0.2 build -i modules -o modules -c classmap.json",
-    "watch": "deno run -A jsr:@veryboringhwl/creator@0.0.2 build -i modules -o modules -c classmap.json -w --dev",
-    "release": "deno run -A jsr:@veryboringhwl/creator@0.0.2 release",
-    "cron": "deno run -A scripts/cron.ts",
-    "lint": "deno run -A npm:@biomejs/biome check --write .",
-    "format": "deno run -A npm:@biomejs/biome format --write ."
+    "build": "deno run -A scripts/build.ts",
+    "watch": "deno run -A scripts/watch.ts",
+    "enable": "deno run -A scripts/enable.ts",
+    "release": "deno run -A scripts/release.ts"
   },
   "compilerOptions": {
     "jsx": "react-jsx",

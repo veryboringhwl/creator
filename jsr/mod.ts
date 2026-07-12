@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { chmod, mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -62,7 +62,16 @@ function cacheRoot(): string {
 }
 
 function binaryPath(name: string): string {
+  const dotExe = ".exe";
+  if (name.endsWith(dotExe)) {
+    const base = name.slice(0, -dotExe.length);
+    return join(cacheRoot(), `${base}-${VERSION}${dotExe}`);
+  }
   return join(cacheRoot(), `${name}-${VERSION}`);
+}
+
+function sha256Path(name: string): string {
+  return `${binaryPath(name)}.sha256`;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -74,98 +83,110 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+function abort(message: string): never {
+  console.error(message);
+  process.exit(1);
+}
+
 async function ensureBinary(): Promise<string> {
   const platform = detectPlatform();
   const name = assetName(platform);
   const bin = binaryPath(name);
 
-  if (await exists(bin)) {
+  if ((await exists(bin)) && (await exists(sha256Path(name)))) {
     return bin;
   }
 
   const cache = cacheRoot();
   await mkdir(cache, { recursive: true });
 
-  const url = `https://github.com/veryboringhwl/creator/releases/download/v${VERSION}/${name}`;
-  const tmp = join(cache, `${name}-${VERSION}.${randomUUID()}.tmp`);
+  const baseUrl = `https://github.com/veryboringhwl/creator/releases/download/v${VERSION}`;
+  const assetUrl = `${baseUrl}/${name}`;
+  const sha256Url = `${baseUrl}/${name}.sha256`;
 
   console.error(`Downloading creator v${VERSION} for ${platform.os}-${platform.arch}...`);
 
-  let res: Response;
-  try {
-    res = await fetch(url);
-  } catch (err) {
-    console.error(
-      `Failed to reach GitHub. Check your network connection.\n` +
-        `Error: ${err instanceof Error ? err.message : String(err)}`
-    );
-    process.exit(1);
-  }
-
-  if (!res.ok) {
-    if (res.status === 404) {
-      console.error(
+  const [binRes, shaRes] = await Promise.all([fetch(assetUrl), fetch(sha256Url)]);
+  if (!binRes.ok) {
+    if (binRes.status === 404) {
+      abort(
         `No binary found for ${platform.os}-${platform.arch}.\n\n` +
           `Ensure a GitHub Release tagged "creator-v${VERSION}" exists ` +
-          `with the asset "${name}".\n` +
-          `Expected URL: ${url}`
+          `with the assets "${name}" and "${name}.sha256".\n` +
+          `Expected URL: ${assetUrl}`
       );
-    } else {
-      console.error(`Download failed: HTTP ${res.status} ${res.statusText}`);
     }
-    process.exit(1);
+    abort(`Download failed: HTTP ${binRes.status} ${binRes.statusText}`);
+  }
+  if (!shaRes.ok) {
+    abort(`sha256 manifest missing: HTTP ${shaRes.status} ${shaRes.statusText}`);
+  }
+
+  const expectedSha = (await shaRes.text()).trim().split(/\s+/)[0];
+  if (!/^[0-9a-f]{64}$/.test(expectedSha)) {
+    abort(`sha256 manifest is malformed: ${expectedSha}`);
   }
 
   let bytes: Uint8Array;
   try {
-    bytes = new Uint8Array(await res.arrayBuffer());
+    bytes = new Uint8Array(await binRes.arrayBuffer());
   } catch (err) {
-    console.error(
+    abort(
       `Failed to read download stream.\n` +
         `Error: ${err instanceof Error ? err.message : String(err)}`
     );
-    await rm(tmp, { force: true });
-    process.exit(1);
   }
-
   if (bytes.length === 0) {
-    console.error("Downloaded binary is empty. The release asset may be corrupt.");
-    process.exit(1);
+    abort("Downloaded binary is empty. The release asset may be corrupt.");
   }
 
+  const actualSha = createHash("sha256").update(bytes).digest("hex");
+  if (actualSha !== expectedSha) {
+    abort(
+      `sha256 mismatch.\n` +
+        `  expected: ${expectedSha}\n` +
+        `  actual:   ${actualSha}\n` +
+        `Refusing to execute an unverified binary. Delete the partial download ` +
+        `in ${cache} and retry.`
+    );
+  }
+
+  const tmp = join(cache, `${name}-${VERSION}.${crypto.randomUUID()}.tmp`);
   try {
     await writeFile(tmp, bytes);
   } catch (err) {
-    console.error(
+    abort(
       `Failed to write binary to disk.\n` +
         `Path: ${tmp}\n` +
         `Error: ${err instanceof Error ? err.message : String(err)}`
     );
-    process.exit(1);
   }
 
   if (process.platform !== "win32") {
     try {
       await chmod(tmp, 0o755);
     } catch (err) {
-      console.error(
+      await rm(tmp, { force: true });
+      abort(
         `Failed to set executable permissions.\n` +
           `Error: ${err instanceof Error ? err.message : String(err)}`
       );
-      process.exit(1);
     }
   }
 
   try {
     await rename(tmp, bin);
   } catch (err) {
-    console.error(
+    await rm(tmp, { force: true });
+    abort(
       `Failed to finalize binary installation.\n` +
         `Error: ${err instanceof Error ? err.message : String(err)}`
     );
-    await rm(tmp, { force: true });
-    process.exit(1);
   }
+
+  try {
+    await writeFile(sha256Path(name), expectedSha + "\n");
+  } catch {}
 
   return bin;
 }
@@ -182,8 +203,9 @@ function run(bin: string): Promise<void> {
 
     child.on("close", (code, signal) => {
       if (signal) {
+        const numeric = osSignals[signal];
         console.error(`Creator was killed by signal: ${signal}`);
-        process.exit(128 + (typeof signal === "string" ? osSignum(signal) : 0) || 1);
+        process.exit(128 + (numeric ?? 0));
       }
       if (code !== 0 && code !== null) {
         process.exit(code);
@@ -193,42 +215,23 @@ function run(bin: string): Promise<void> {
   });
 }
 
-function osSignum(signal: string): number {
-  const map: Record<string, number> = {
-    SIGHUP: 1,
-    SIGINT: 2,
-    SIGQUIT: 3,
-    SIGILL: 4,
-    SIGTRAP: 5,
-    SIGABRT: 6,
-    SIGBUS: 7,
-    SIGFPE: 8,
-    SIGKILL: 9,
-    SIGUSR1: 10,
-    SIGSEGV: 11,
-    SIGUSR2: 12,
-    SIGPIPE: 13,
-    SIGALRM: 14,
-    SIGTERM: 15,
-    SIGSTKFLT: 16,
-    SIGCHLD: 17,
-    SIGCONT: 18,
-    SIGSTOP: 19,
-    SIGTSTP: 20,
-    SIGTTIN: 21,
-    SIGTTOU: 22,
-    SIGURG: 23,
-    SIGXCPU: 24,
-    SIGXFSZ: 25,
-    SIGVTALRM: 26,
-    SIGPROF: 27,
-    SIGWINCH: 28,
-    SIGPOLL: 29,
-    SIGPWR: 30,
-    SIGSYS: 31
-  };
-  return map[signal] ?? 0;
-}
+const osSignals: Readonly<Record<string, number>> = {
+  SIGHUP: 1,
+  SIGINT: 2,
+  SIGQUIT: 3,
+  SIGILL: 4,
+  SIGTRAP: 5,
+  SIGABRT: 6,
+  SIGBUS: 7,
+  SIGFPE: 8,
+  SIGKILL: 9,
+  SIGUSR1: 10,
+  SIGSEGV: 11,
+  SIGUSR2: 12,
+  SIGPIPE: 13,
+  SIGALRM: 14,
+  SIGTERM: 15
+};
 
 function isMain(): boolean {
   if (typeof (import.meta as { main?: boolean }).main === "boolean") {
