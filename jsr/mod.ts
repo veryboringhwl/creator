@@ -184,9 +184,7 @@ async function ensureBinary(): Promise<string> {
     );
   }
 
-  try {
-    await writeFile(sha256Path(name), expectedSha + "\n");
-  } catch {}
+  await writeFile(sha256Path(name), expectedSha + "\n");
 
   return bin;
 }
