@@ -1,5 +1,5 @@
 use base64::Engine;
-use oxc::allocator::{Allocator, Box, FromIn};
+use oxc::allocator::{Allocator, FromIn};
 use oxc::ast::AstBuilder;
 use oxc::ast::ast::{
     ExportAllDeclaration, ExportNamedDeclaration, Expression, ImportDeclaration, MemberExpression, Str
@@ -81,10 +81,10 @@ impl JsTranspiler {
         source_type: SourceType,
     ) -> Result<oxc::ast::ast::Program<'a>> {
         let parser_ret = Parser::new(allocator, source, source_type).parse();
-        if !parser_ret.errors.is_empty() {
+        if !parser_ret.diagnostics.is_empty() {
             return Err(Error::parse(
                 "<js>",
-                format!("oxc parser errors: {:?}", parser_ret.errors),
+                format!("oxc parser errors: {:?}", parser_ret.diagnostics),
             ));
         }
         Ok(parser_ret.program)
@@ -98,10 +98,10 @@ impl JsTranspiler {
         let semantic_ret = SemanticBuilder::new()
             .with_check_syntax_error(true)
             .build(&program);
-        if !semantic_ret.errors.is_empty() {
+        if !semantic_ret.diagnostics.is_empty() {
             return Err(Error::parse(
                 node.path.clone(),
-                format!("oxc semantic errors: {:?}", semantic_ret.errors),
+                format!("oxc semantic errors: {:?}", semantic_ret.diagnostics),
             ));
         }
         let scoping = semantic_ret.semantic.into_scoping();
@@ -125,10 +125,10 @@ impl JsTranspiler {
 
         let ret = Transformer::new(&allocator, &node.path, &transform_options)
             .build_with_scoping(scoping, &mut program);
-        if !ret.errors.is_empty() {
+        if !ret.diagnostics.is_empty() {
             return Err(Error::transpile(
                 node.path.clone(),
-                format!("oxc transform errors: {:?}", ret.errors),
+                format!("oxc transform errors: {:?}", ret.diagnostics),
             ));
         }
 
@@ -290,9 +290,12 @@ impl<'a, 'b> VisitMut<'a> for MapExpressionReplacer<'a, 'b> {
         {
             let span = me.span();
             let ast = AstBuilder::new(self.allocator);
-            let literal =
-                ast.string_literal(span, Str::from_in(leaf.as_str(), self.allocator), None);
-            *expr = Expression::StringLiteral(Box::new_in(literal, self.allocator));
+            *expr = Expression::new_string_literal(
+                span,
+                Str::from_in(leaf.as_str(), self.allocator),
+                None,
+                &ast,
+            );
             return;
         }
         walk_mut::walk_expression(self, expr);
