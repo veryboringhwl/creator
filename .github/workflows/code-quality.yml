@@ -19,6 +19,7 @@ jobs:
           - name: Lint
             run: deno run -A npm:oxlint --deny-warnings
           - name: Type check
+            working-directory: jsr
             run: deno check
 
   rust-code-quality:
