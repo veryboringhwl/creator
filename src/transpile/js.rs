@@ -63,8 +63,13 @@ impl JsTranspiler {
             return Some("/modules/stdlib/src/expose/jsx-runtime.js".to_string());
         }
 
-        if ctx.env.dev && (specifier.starts_with("./") || specifier.starts_with("../")) {
-            return Some(format!("{specifier}?t={}", ctx.timestamp));
+        if ctx.env.dev
+            && (specifier.starts_with("./")
+                || specifier.starts_with("../")
+                || specifier.starts_with('/'))
+        {
+            let ts = self.resolve_timestamp(specifier, ctx);
+            return Some(format!("{specifier}?t={ts}"));
         }
 
         if let Some(rewritten) = self.rewrite_extension(specifier) {
@@ -72,6 +77,18 @@ impl JsTranspiler {
         }
 
         None
+    }
+
+    fn resolve_timestamp(&self, specifier: &str, ctx: &TranspileContext) -> u128 {
+        if specifier.starts_with("./") || specifier.starts_with("../") {
+            return ctx.timestamp;
+        }
+        if let Some(module_name) = extract_module_name(specifier)
+            && let Some(ts) = ctx.resolve_dep_timestamp(module_name)
+        {
+            return ts;
+        }
+        ctx.timestamp
     }
 
     fn parse<'a>(
@@ -224,6 +241,11 @@ impl Transpile for JsTranspiler {
 
 fn is_remote(specifier: &str) -> bool {
     specifier.starts_with("http://") || specifier.starts_with("https://")
+}
+
+fn extract_module_name(specifier: &str) -> Option<&str> {
+    let rest = specifier.strip_prefix("/modules/")?;
+    rest.split('/').next()
 }
 
 struct SpecifierRewriter<'a, F: Fn(&str) -> Option<String>> {

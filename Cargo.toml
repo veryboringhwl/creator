@@ -12,6 +12,8 @@ grass = "0.13"
 lightningcss = "1.0.0-alpha.71"
 minijinja = { version = "2.21", default-features = false, features = ["builtins", "json", "serde"] }
 notify = "8.2.0"
+opener = "0.8"
+owo-colors = "4.3.0"
 oxc = { version = "0.139", features = ["full"] }
 rayon = "1.12"
 regex = "1.13"

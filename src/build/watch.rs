@@ -10,6 +10,7 @@ use crate::core::{Error, Result, remove_if_exists};
 
 pub struct WatchOptions {
     pub debounce: Duration,
+    pub module: Option<String>,
 }
 
 pub fn watch(builder: &Builder, options: WatchOptions) -> Result<()> {
@@ -27,6 +28,9 @@ pub fn watch(builder: &Builder, options: WatchOptions) -> Result<()> {
         .map_err(|e| Error::Watch(format!("watch {}: {e}", builder.source_dir().display())))?;
 
     let mut affected: HashSet<NodeId> = HashSet::new();
+    let module = options
+        .module
+        .unwrap_or_else(|| builder.plan().metadata.name.clone());
 
     loop {
         let event = match rx.recv() {
@@ -38,6 +42,8 @@ pub fn watch(builder: &Builder, options: WatchOptions) -> Result<()> {
 
         if let Err(err) = run_affected(builder, &mut affected) {
             tracing::error!(?err, "watch build failed");
+        } else {
+            reload_module(&module);
         }
 
         let mut deadline = Instant::now() + options.debounce;
@@ -58,6 +64,8 @@ pub fn watch(builder: &Builder, options: WatchOptions) -> Result<()> {
 
         if let Err(err) = run_affected(builder, &mut affected) {
             tracing::error!(?err, "watch build failed");
+        } else {
+            reload_module(&module);
         }
     }
 }
@@ -135,4 +143,12 @@ fn corresponding_output(builder: &Builder, source: &Path) -> PathBuf {
         _ => {}
     }
     out
+}
+
+fn reload_module(name: &str) {
+    let uri = format!("spotify:app:rpc:reload?module={name}");
+    match opener::open(&uri) {
+        Ok(()) => tracing::info!(%name, "reload triggered"),
+        Err(e) => tracing::warn!(%name, ?e, "failed to trigger reload"),
+    }
 }

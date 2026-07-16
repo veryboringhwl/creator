@@ -2,6 +2,7 @@ pub mod build;
 pub mod classmap;
 pub mod new;
 pub mod release;
+pub mod watch;
 
 use std::path::PathBuf;
 
@@ -50,10 +51,13 @@ pub enum Command {
         module: Option<String>,
 
         #[arg(short = 'i', long = "input-dir")]
-        input_dir: PathBuf,
+        input_dir: Option<PathBuf>,
 
         #[arg(short = 'o', long = "output-dir")]
-        output_dir: PathBuf,
+        output_dir: Option<PathBuf>,
+
+        #[arg(short = 'm', long = "modules", num_args = 1..)]
+        modules: Option<Vec<PathBuf>>,
 
         #[arg(short = 'c', long = "classmap", default_value = "classmap.json")]
         classmap: PathBuf,
@@ -83,6 +87,24 @@ pub enum Command {
 
         #[arg(long = "dev", default_value_t = false)]
         dev: bool,
+    },
+
+    #[command(about = "Watch a workspace of modules with dependency-aware cascading rebuilds")]
+    Watch {
+        #[arg(short = 'm', long = "modules", num_args = 1..)]
+        modules: Vec<PathBuf>,
+
+        #[arg(short = 'c', long = "classmap", default_value = "classmap.json")]
+        classmap: PathBuf,
+
+        #[arg(long = "debounce", default_value_t = 1000)]
+        debounce: u64,
+
+        #[arg(long = "dev", default_value_t = true)]
+        dev: bool,
+
+        #[arg(long = "source-map", default_value_t = false)]
+        source_map: bool,
     },
 
     ClassmapFetch {
@@ -121,6 +143,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             module,
             input_dir,
             output_dir,
+            modules,
             classmap,
             watch,
             debounce,
@@ -130,6 +153,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             module,
             input_dir,
             output_dir,
+            modules,
             classmap,
             watch,
             debounce,
@@ -162,6 +186,19 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 modules_dir,
             })
         }
+        Command::Watch {
+            modules,
+            classmap,
+            debounce,
+            dev,
+            source_map,
+        } => watch::run(crate::cli::watch::WatchOpts {
+            modules,
+            classmap,
+            debounce,
+            dev,
+            source_map,
+        }),
     }
 }
 

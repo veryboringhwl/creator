@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::build::{NodeId, SharedGraph, SourceKind, SourceNode, build_shared_graph};
@@ -89,7 +90,12 @@ impl Builder {
 
     pub fn run_for(&self, node_ids: &[NodeId]) -> Result<BuilderOutcome> {
         util::ensure_dir(&self.plan.output_dir)?;
-        let ctx = TranspileContext::new(self.plan.env.clone(), util::unix_millis_now());
+        let dep_timestamps = self.resolve_dependency_timestamps();
+        let ctx = TranspileContext::new(
+            self.plan.env.clone(),
+            util::unix_millis_now(),
+            dep_timestamps,
+        );
         let mut outcome = BuilderOutcome::default();
         {
             let graph = self.graph.read();
@@ -101,19 +107,35 @@ impl Builder {
                 self.process_node(node, &ctx, &mut outcome)?;
             }
         }
-        self.write_timestamp()?;
+        self.write_timestamp(ctx.timestamp)?;
         Ok(outcome)
     }
 
-    fn write_timestamp(&self) -> Result<()> {
+    fn write_timestamp(&self, timestamp: u128) -> Result<()> {
         let path = self.plan.output_dir.join("timestamp");
         if self.plan.env.dev {
-            let timestamp = util::unix_millis_now();
             util::write_text(&path, &timestamp.to_string())?;
         } else if path.exists() {
             std::fs::remove_file(&path).map_err(|source| crate::core::Error::io(&path, source))?;
         }
         Ok(())
+    }
+
+    fn resolve_dependency_timestamps(&self) -> HashMap<String, u128> {
+        let mut dep_timestamps = HashMap::new();
+        let Some(modules_dir) = self.plan.source_dir.parent() else {
+            return dep_timestamps;
+        };
+        for dep_name in self.plan.metadata.dependencies.keys() {
+            let dep_dir = modules_dir.join(dep_name.as_str());
+            let ts_path = dep_dir.join("timestamp");
+            if let Ok(contents) = std::fs::read_to_string(&ts_path)
+                && let Ok(ts) = contents.trim().parse::<u128>()
+            {
+                dep_timestamps.insert(dep_name.as_str().to_string(), ts);
+            }
+        }
+        dep_timestamps
     }
 
     fn should_process(&self, node: &SourceNode) -> bool {
