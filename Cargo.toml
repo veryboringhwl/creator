@@ -14,7 +14,7 @@ minijinja = { version = "2.21", default-features = false, features = ["builtins"
 notify = "8.2.0"
 opener = "0.8"
 owo-colors = "4.3.0"
-oxc = { version = "0.139", features = ["full"] }
+oxc = { version = "0.140", features = ["full"] }
 rayon = "1.12"
 regex = "1.13"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
